@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solace</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root { --sol-bg: #000000; --sol-sidebar: #0f0f0f; --sol-card: #141414; --sol-red: #ff0000; --sol-white: #ffffff; }
+        body { background-color: var(--sol-bg); color: var(--sol-white); font-family: 'Inter', sans-serif; margin: 0; }
+        
+        /* Login Overlay */
+        #login-overlay { position: fixed; inset: 0; background: var(--sol-bg); z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .login-card { width: 100%; max-width: 360px; padding: 40px; background: var(--sol-sidebar); border-radius: 12px; border: 1px solid #333; text-align: center; }
+        
+        /* Sidebar & Mobile Toggle */
+        .sidebar { width: 250px; height: 100vh; background: var(--sol-sidebar); position: fixed; left: 0; top: 0; border-right: 1px solid #222; transition: 0.3s; z-index: 2000; }
+        .nav-link { color: var(--sol-white); padding: 14px 25px; border-radius: 0 50px 50px 0; margin-bottom: 4px; border: none; background: transparent; width: 95%; text-align: left; transition: 0.2s; }
+        .nav-link.active { background: #2a2a2a; border-left: 5px solid var(--sol-red); font-weight: bold; }
+        
+        .main-panel { margin-left: 250px; padding: 20px; transition: 0.3s; }
+        .mobile-header { display: none; background: var(--sol-sidebar); padding: 15px; border-bottom: 1px solid #222; position: sticky; top: 0; z-index: 1500; }
+
+        /* Tablet/Mobile Adjustments */
+        @media (max-width: 992px) {
+            .sidebar { left: -250px; }
+            .sidebar.active { left: 0; }
+            .main-panel { margin-left: 0; }
+            .mobile-header { display: flex; justify-content: space-between; align-items: center; }
+            .admin-only .row > div { margin-bottom: 10px; }
+        }
+
+        /* Responsive Elements */
+        .sol-card { background: var(--sol-card); border-radius: 10px; padding: 20px; margin-bottom: 20px; border: 1px solid #222; }
+        .sol-input { background: #000 !important; border: 1px solid #333 !important; color: white !important; font-size: 0.9rem; }
+        .sol-input:focus { border-color: var(--sol-red) !important; box-shadow: none; }
+        .table-responsive { border: none; }
+        .table { color: var(--sol-white); border-color: #222; min-width: 600px; }
+        .btn-red { background: var(--sol-red); color: white; border: none; font-weight: bold; padding: 10px; border-radius: 5px; text-transform: uppercase; }
+        
+        /* Calendar Responsive */
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid #333; min-width: 700px; }
+        .cal-day { min-height: 100px; border: 1px solid #222; padding: 5px; font-size: 0.7rem; }
+        .cal-event { font-size: 0.6rem; padding: 2px 4px; border-radius: 3px; margin-top: 2px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bg-red { background: var(--sol-red); color: white; }
+        .border-red { border: 1px solid var(--sol-red); color: var(--sol-red); }
+    </style>
+</head>
+<body>
+
+<div id="login-overlay">
+    <div class="login-card">
+        <h1 class="fw-bold mb-4" style="color:var(--sol-red); letter-spacing: 3px;">SOLACE</h1>
+        <input type="text" id="u-in" class="form-control sol-input mb-3 text-center" placeholder="USERNAME">
+        <input type="password" id="p-in" class="form-control sol-input mb-4 text-center" placeholder="PASSWORD">
+        <button class="btn btn-red w-100" onclick="login()">Enter</button>
+    </div>
+</div>
+
+<div class="mobile-header" id="mob-head" style="display:none">
+    <button class="btn text-white fs-3" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+    <h4 class="m-0 fw-bold" style="color:var(--sol-red)">Solace</h4>
+    <div style="width:40px"></div>
+</div>
+
+<div class="sidebar" id="sidebar" style="display:none">
+    <div class="p-4 mb-4 d-flex justify-content-between align-items-center">
+        <h2 class="fw-bold m-0" style="color:var(--sol-red);">Solace</h2>
+        <button class="btn text-white d-lg-none" onclick="toggleSidebar()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="nav flex-column">
+        <button class="nav-link active" onclick="showTab('tab-pro', this)">Projects</button>
+        <button class="nav-link" onclick="showTab('tab-cust', this)">Customers</button>
+        <button class="nav-link" onclick="showTab('tab-cal', this); renderCalendar()">Calendar</button>
+        <button class="nav-link" onclick="showTab('tab-chk', this)">Checklist</button>
+        <button class="nav-link" onclick="showTab('tab-inv', this)">Inventory</button>
+        <button class="nav-link" onclick="showTab('tab-fin', this)">Financials</button>
+        <button class="nav-link text-danger mt-5" onclick="location.reload()">Logout</button>
+    </div>
+</div>
+
+<div class="main-panel" id="main-panel" style="display:none">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold text-uppercase" id="tab-label">Projects</h4>
+        <div class="small text-muted"><span id="user-display" class="text-white"></span></div>
+    </div>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-pro">
+            <div class="sol-card admin-only">
+                <div class="row g-2">
+                    <div class="col-lg-3"><input type="text" id="p-name" class="form-control sol-input" placeholder="Client"></div>
+                    <div class="col-lg-3"><input type="text" id="p-apt" class="form-control sol-input" placeholder="Apartment/Company"></div>
+                    <div class="col-lg-2"><input type="date" id="p-start" class="form-control sol-input"></div>
+                    <div class="col-lg-2"><input type="date" id="p-end" class="form-control sol-input"></div>
+                    <div class="col-lg-2"><button class="btn btn-red w-100" onclick="addItem('projects')">Create</button></div>
+                </div>
+            </div>
+            <div class="sol-card p-0 overflow-hidden"><div class="table-responsive"><table class="table m-0"><thead><tr id="head-pro"></tr></thead><tbody id="list-pro"></tbody></table></div></div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-cust">
+            <div class="sol-card admin-only">
+                <div class="row g-2">
+                    <div class="col-lg-3"><input type="text" id="c-name" class="form-control sol-input" placeholder="Lead Name"></div>
+                    <div class="col-lg-3"><input type="text" id="c-apt" class="form-control sol-input" placeholder="Apartment/Company"></div>
+                    <div class="col-lg-2"><input type="date" id="c-date" class="form-control sol-input"></div>
+                    <div class="col-lg-2"><select id="c-status-init" class="form-select sol-input"><option>First Meeting</option><option>Interested</option><option>Signing</option></select></div>
+                    <div class="col-lg-2"><button class="btn btn-red w-100" onclick="addItem('customers')">Add</button></div>
+                </div>
+            </div>
+            <div class="sol-card p-0 overflow-hidden"><div class="table-responsive"><table class="table m-0"><thead><tr id="head-cust"></tr></thead><tbody id="list-cust"></tbody></table></div></div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-cal">
+            <div class="sol-card p-0 overflow-auto">
+                <div class="cal-grid" id="calendar-body"></div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-chk">
+            <div class="sol-card admin-only" id="chk-admin-box">
+                <div class="row g-2"><div class="col-9"><input type="text" id="chk-task" class="form-control sol-input" placeholder="Master Task..."></div><div class="col-3"><button class="btn btn-red w-100" onclick="addItem('tasks')">Add</button></div></div>
+            </div>
+            <div class="sol-card"><div id="checklist-render"></div></div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-inv">
+            <div class="sol-card admin-only"><div class="row g-2"><div class="col-8"><input type="text" id="i-item" class="form-control sol-input"></div><div class="col-4"><button class="btn btn-red w-100" onclick="addItem('inventory')">Update</button></div></div></div>
+            <div class="sol-card p-0 overflow-hidden"><div class="table-responsive"><table class="table m-0"><thead><tr id="head-inv"></tr></thead><tbody id="list-inv"></tbody></table></div></div>
+        </div>
+        <div class="tab-pane fade" id="tab-fin">
+            <div class="sol-card admin-only"><div class="row g-2"><div class="col-8"><input type="text" id="f-desc" class="form-control sol-input"></div><div class="col-4"><button class="btn btn-red w-100" onclick="addItem('finance')">Log</button></div></div></div>
+            <div class="sol-card p-0 overflow-hidden"><div class="table-responsive"><table class="table m-0"><thead><tr id="head-fin"></tr></thead><tbody id="list-fin"></tbody></table><h4 id="total-fin" class="text-end p-3 fw-bold" style="color:var(--sol-red)"></h4></div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let db = JSON.parse(localStorage.getItem('solace_v39')) || {
+        projects: [], customers: [], inventory: [], finance: [], tasks: [],
+        users: [{u: 'taksheel', p: 'tvsk2009@', role: 'Managing Partner'}]
+    };
+    let sessionUser = null;
+
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); }
+
+    function showTab(tabId, el) {
+        document.querySelectorAll('.tab-pane').forEach(t => t.classList.remove('show', 'active'));
+        document.getElementById(tabId).classList.add('show', 'active');
+        document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('tab-label').innerText = el.innerText;
+        if(window.innerWidth < 992) toggleSidebar();
+    }
+
+    function login() {
+        const u = document.getElementById('u-in').value, p = document.getElementById('p-in').value;
+        sessionUser = db.users.find(x => x.u === u && x.p === p);
+        if(sessionUser) {
+            document.getElementById('login-overlay').style.display='none';
+            document.getElementById('sidebar').style.display='block';
+            document.getElementById('mob-head').style.display='flex';
+            document.getElementById('main-panel').style.display='block';
+            document.getElementById('user-display').innerText = sessionUser.u;
+            const isP = sessionUser.role === 'Managing Partner';
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = isP ? 'block' : 'none');
+            render();
+        } else alert("DENIED");
+    }
+
+    function addItem(type) {
+        if(type==='projects') db.projects.push({id: Date.now(), n:document.getElementById('p-name').value, apt:document.getElementById('p-apt').value, start:document.getElementById('p-start').value, end:document.getElementById('p-end').value, status: 'Structure Done'});
+        if(type==='customers') db.customers.push({id:Date.now(), n:document.getElementById('c-name').value, apt:document.getElementById('c-apt').value, date:document.getElementById('c-date').value, status:document.getElementById('c-status-init').value});
+        if(type==='tasks') db.tasks.push({id:Date.now(), text:document.getElementById('chk-task').value, done:false});
+        if(type==='inventory') db.inventory.push({id:Date.now(), i:document.getElementById('i-item').value, q: 0});
+        if(type==='finance') db.finance.push({id:Date.now(), d:document.getElementById('f-desc').value, a: 0});
+        save();
+    }
+
+    function save() { localStorage.setItem('solace_v39', JSON.stringify(db)); render(); }
+    function deleteItem(type, id) { db[type] = db[type].filter(x => x.id !== id); save(); }
+
+    function renderCalendar() {
+        const grid = document.getElementById('calendar-body'); grid.innerHTML = '';
+        for(let i=1; i<=31; i++) {
+            const dateStr = `2026-03-${String(i).padStart(2,'0')}`;
+            let html = `<div class="cal-day"><span style="color:#444">${i}</span>`;
+            db.customers.filter(c => c.date === dateStr).forEach(c => html += `<span class="cal-event bg-red">${c.n}</span>`);
+            db.projects.filter(p => p.start <= dateStr && p.end >= dateStr).forEach(p => html += `<span class="cal-event border-red">${p.n}</span>`);
+            grid.innerHTML += html + `</div>`;
+        }
+    }
+
+    function render() {
+        const isM = sessionUser.role.includes('Manager') || sessionUser.role.includes('Partner');
+        const isP = sessionUser.role === 'Managing Partner';
+        const trash = (t, id) => isP ? `<td><i class="bi bi-trash text-danger pointer" onclick="deleteItem('${t}',${id})"></i></td>` : '';
+
+        // Tables logic matches your previous versions exactly
+        const pStatus = ["Structure Done", "Wiring Done", "Solar Panels Installed", "Project Finished", "Annual Maintenance"];
+        document.getElementById('head-pro').innerHTML = `<th>Client</th><th>Apartment</th><th>Start</th><th>End</th><th>Status</th>${isP?'<th></th>':''}`;
+        document.getElementById('list-pro').innerHTML = db.projects.map(x => `<tr><td>${x.n}</td><td>${x.apt}</td><td>${x.start}</td><td>${x.end}</td><td><select onchange="db.projects.find(p=>p.id===${x.id}).status=this.value;save()" class="sol-input form-select form-select-sm" ${!isM?'disabled':''}>${pStatus.map(s=>`<option ${x.status===s?'selected':''}>${s}</option>`).join('')}</select></td>${trash('projects',x.id)}</tr>`).join('');
+
+        const cStatus = ["First Meeting", "Interested", "Signing"];
+        document.getElementById('head-cust').innerHTML = `<th>Client</th><th>Apartment</th><th>Date</th><th>Status</th>${isP?'<th></th>':''}`;
+        document.getElementById('list-cust').innerHTML = db.customers.map(x => `<tr><td>${x.n}</td><td>${x.apt}</td><td>${x.date}</td><td><select onchange="db.customers.find(c=>c.id===${x.id}).status=this.value;save()" class="sol-input form-select form-select-sm" ${!isM?'disabled':''}>${cStatus.map(s=>`<option ${x.status===s?'selected':''}>${s}</option>`).join('')}</select></td>${trash('customers',x.id)}</tr>`).join('');
+
+        document.getElementById('checklist-render').innerHTML = db.tasks.map(t => `<div class="d-flex justify-content-between p-3 border-bottom border-dark"><span><input type="checkbox" ${t.done?'checked':''} onchange="db.tasks.find(k=>k.id===${t.id}).done=!${t.done};save()" class="form-check-input me-3"> ${t.text}</span>${isM?`<i class="bi bi-x-circle text-danger pointer" onclick="deleteItem('tasks',${t.id})"></i>`:''}</div>`).join('');
+        
+        document.getElementById('head-inv').innerHTML = `<th>Item</th>${isP?'<th></th>':''}`;
+        document.getElementById('list-inv').innerHTML = db.inventory.map(x => `<tr><td>${x.i}</td>${trash('inventory',x.id)}</tr>`).join('');
+        
+        let total = 0;
+        document.getElementById('head-fin').innerHTML = `<th>Desc</th><th>Amt</th>${isP?'<th></th>':''}`;
+        document.getElementById('list-fin').innerHTML = db.finance.map(x => { total += x.a; return `<tr><td>${x.d}</td><td>₹${x.a}</td>${trash('finance',x.id)}</tr>` }).join('');
+        document.getElementById('total-fin').innerText = "Total: ₹" + total;
+    }
+</script>
+</body>
+</html>
